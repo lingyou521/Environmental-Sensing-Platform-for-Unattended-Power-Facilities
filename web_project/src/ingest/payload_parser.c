@@ -693,6 +693,27 @@ static int parse_property_bool_field(const char *json, const char *key, int *out
     return PARSE_OK;
 }
 
+static int parse_int_or_property_field(const char *json, const char *key, int *out)
+{
+    int result = parse_int_field(json, key, out);
+    return result == PARSE_MISSING || result == PARSE_INVALID ?
+        parse_property_int_field(json, key, out) : result;
+}
+
+static int parse_double_or_property_field(const char *json, const char *key, double *out)
+{
+    int result = parse_double_field(json, key, out);
+    return result == PARSE_MISSING || result == PARSE_INVALID ?
+        parse_property_double_field(json, key, out) : result;
+}
+
+static int parse_bool_or_property_field(const char *json, const char *key, int *out)
+{
+    int result = parse_bool_field(json, key, out);
+    return result == PARSE_MISSING || result == PARSE_INVALID ?
+        parse_property_bool_field(json, key, out) : result;
+}
+
 int payload_parse_json(const char *payload, device_sample_t *sample)
 {
     double gps_speed = 0.0;
@@ -755,14 +776,21 @@ int payload_parse_json(const char *payload, device_sample_t *sample)
     if (sample->timestamp > SQLITE_INT64_MAX_U64) {
         return -1;
     }
-    COUNT_OPTIONAL(parse_double_field(payload, "temperature", &sample->temperature));
-    COUNT_OPTIONAL(parse_double_field(payload, "temp", &sample->temperature));
+    COUNT_OPTIONAL(parse_double_or_property_field(payload, "temperature", &sample->temperature));
+    COUNT_OPTIONAL(parse_double_or_property_field(payload, "temp", &sample->temperature));
     COUNT_OPTIONAL_ASSIGN(parse_property_double_field(payload, "tempval", &tmp),
                           sample->temperature = tmp);
-    COUNT_OPTIONAL(parse_double_field(payload, "humidity", &sample->humidity));
-    COUNT_OPTIONAL(parse_double_field(payload, "hum", &sample->humidity));
+    COUNT_OPTIONAL(parse_double_or_property_field(payload, "humidity", &sample->humidity));
+    COUNT_OPTIONAL(parse_double_or_property_field(payload, "hum", &sample->humidity));
     COUNT_OPTIONAL_ASSIGN(parse_property_double_field(payload, "humval", &tmp),
                           sample->humidity = tmp);
+    COUNT_OPTIONAL(parse_int_or_property_field(payload, "smoke_raw", &sample->smoke_raw));
+    COUNT_OPTIONAL(parse_int_or_property_field(payload, "smoke", &sample->smoke_raw));
+    COUNT_OPTIONAL(parse_bool_or_property_field(payload, "smoke_alarm", &sample->smoke_alarm));
+    COUNT_OPTIONAL(parse_bool_or_property_field(payload, "door_open", &sample->door_open));
+    COUNT_OPTIONAL(parse_bool_or_property_field(payload, "person_detected", &sample->person_detected));
+    COUNT_OPTIONAL(parse_bool_or_property_field(payload, "facility_alarm", &sample->facility_alarm));
+    COUNT_OPTIONAL(parse_int_or_property_field(payload, "alarm_level", &sample->alarm_level));
     COUNT_OPTIONAL(parse_int_field(payload, "alcohol_raw", &sample->alcohol_raw));
     COUNT_OPTIONAL(parse_int_field(payload, "alcohol", &sample->alcohol_raw));
     COUNT_OPTIONAL(parse_property_int_field(payload, "aclval", &sample->alcohol_raw));
@@ -814,6 +842,19 @@ int payload_parse_json(const char *payload, device_sample_t *sample)
     }
     if (find_key(payload, "flamest") != NULL || find_key(payload, "flame_status") != NULL) {
         sample->flame_valid = 1;
+    }
+
+    /* Legacy aliases remain populated for older Web clients and databases. */
+    if (find_key(payload, "smoke_raw") != NULL || find_key(payload, "smoke") != NULL) {
+        sample->alcohol_raw = sample->smoke_raw;
+        sample->alcohol_alarm = sample->smoke_alarm;
+    }
+    if (find_key(payload, "door_open") != NULL ||
+        find_key(payload, "person_detected") != NULL ||
+        find_key(payload, "facility_alarm") != NULL ||
+        find_key(payload, "alarm_level") != NULL) {
+        sample->motion_state = sample->door_open ? 1 : (sample->person_detected ? 2 : 0);
+        sample->motion_alarm = sample->facility_alarm;
     }
 
     return 0;

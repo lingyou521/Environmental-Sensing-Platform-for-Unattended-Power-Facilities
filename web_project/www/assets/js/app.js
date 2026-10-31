@@ -120,11 +120,18 @@ function ageText(ts) {
 }
 
 function hasTelemetry(data) {
-  return Boolean(data?.sensors && (data.sensors.cargo || data.sensors.cabin));
+  return Boolean(data?.facility || data?.sensors);
 }
 
 function alarmFlags(data) {
   if (!hasTelemetry(data)) return [];
+  if (data.facility) {
+    const flags = [];
+    if (data.facility.smoke_alarm) flags.push('烟雾');
+    if (data.facility.door_open) flags.push('门磁');
+    if (data.facility.person_detected) flags.push('人员');
+    return flags;
+  }
   const cabin = data.sensors?.cabin || {};
   const cargo = data.sensors?.cargo || {};
   const vib = cargo.vibration || {};
@@ -345,21 +352,17 @@ function resetRealtime(message) {
   setText('timestamp', EMPTY_TEXT);
   setText('temperature', EMPTY_TEXT);
   setText('humidity', EMPTY_TEXT);
-  setText('alcohol', EMPTY_TEXT);
-  setText('motion', EMPTY_TEXT);
-  setText('motionAlarm', EMPTY_TEXT);
-  setText('gps', EMPTY_TEXT);
-  setText('speed', EMPTY_TEXT);
-  setText('satellites', EMPTY_TEXT);
-  setText('fence', EMPTY_TEXT);
+  setText('smoke', EMPTY_TEXT);
+  setText('door', EMPTY_TEXT);
+  setText('person', EMPTY_TEXT);
+  setText('facilityAlarm', EMPTY_TEXT);
   setText('dataFreshness', '无实时数据');
-  setText('ingestStatus', '等待 MQTT/OneNET 上报');
-  setText('operatorHint', '请先确认转发脚本、OneNET 数据流转或测试 curl 是否已写入遥测');
+  setText('ingestStatus', '等待 MQTT 上报');
+  setText('operatorHint', '请先确认 MQTT 转发或测试数据是否已写入遥测');
   setText('activeAlarms', '0');
   setText('nodeCount', '0');
   updateOnlineBadge(false);
   updateRiskBadge('离线');
-  renderCanNodes([]);
 }
 
 function renderRealtime(data) {
@@ -368,35 +371,26 @@ function renderRealtime(data) {
     return;
   }
 
-  const cargo = data.sensors?.cargo || {};
-  const cabin = data.sensors?.cabin || {};
-  const vib = cargo.vibration || {};
-  const gps = cabin.gps || {};
+  const facility = data.facility || {};
   const online = Boolean(data.online);
   const flags = alarmFlags(data);
   const risk = riskText(data);
-  const nodes = Array.isArray(data.can_nodes) ? data.can_nodes : [];
 
   setText('subtitle', online ? '实时数据已连接' : '设备离线，显示最近一次数据');
   setText('device', data.device);
   setText('timestamp', timeText(data.timestamp));
-  setText('temperature', numberText(cargo.temperature));
-  setText('humidity', numberText(cabin.humidity));
-  setText('alcohol', cabin.alcohol_raw);
-  setText('motion', `${valueText(vib.accel_x)} / ${valueText(vib.accel_y)} / ${valueText(vib.accel_z)}`);
-  setText('motionAlarm', formatBoolStatus(vib.motion_alarm));
-  setText('gps', formatGps(gps));
-  setText('speed', gps.speed != null ? `${numberText(gps.speed, 1)} km/h` : EMPTY_TEXT);
-  setText('satellites', gps.satellites);
-  setText('fence', gps.fence_alarm ? '越界' : '正常');
+  setText('temperature', numberText(facility.temperature));
+  setText('humidity', numberText(facility.humidity));
+  setText('smoke', facility.smoke_raw);
+  setText('door', facility.door_open ? '打开' : '关闭');
+  setText('person', facility.person_detected ? '检测到' : '正常');
+  setText('facilityAlarm', facility.facility_alarm ? '告警' : '正常');
   setText('dataFreshness', ageText(data.timestamp));
   setText('ingestStatus', online ? '接收正常' : '缓存数据');
   setText('operatorHint', flags.length ? `需要处理：${flags.join('、')}告警` : '当前无活动告警');
   setText('activeAlarms', String(flags.length));
-  setText('nodeCount', `${nodes.filter(node => node.online).length}/${nodes.length}`);
   updateOnlineBadge(online);
   updateRiskBadge(risk);
-  renderCanNodes(nodes);
 }
 
 async function loadRealtime() {
@@ -408,7 +402,7 @@ async function loadRealtime() {
 }
 
 function alarmName(type) {
-  const names = { alcohol: '酒精告警', motion: '振动告警', geofence: '围栏告警', flame: '火焰告警' };
+  const names = { smoke: '烟雾告警', door: '门磁告警', person: '人员入侵告警', facility: '设施综合告警' };
   return names[type] || type || '告警';
 }
 
@@ -417,7 +411,7 @@ function alarmLimit() {
 }
 
 function alarmClass(type) {
-  return type === 'flame' || type === 'alcohol' ? 'bad' : 'warn';
+  return type === 'smoke' || type === 'facility' ? 'bad' : 'warn';
 }
 
 function selectedAlarmFilter() {
@@ -436,10 +430,9 @@ function renderAlarmSummary(alarms) {
     return acc;
   }, { total: 0 });
   setText('alarmTotal', counts.total);
-  setText('alarmAlcohol', counts.alcohol || 0);
-  setText('alarmMotion', counts.motion || 0);
-  setText('alarmGeofence', counts.geofence || 0);
-  setText('alarmFlame', counts.flame || 0);
+  setText('alarmSmoke', counts.smoke || 0);
+  setText('alarmDoor', counts.door || 0);
+  setText('alarmPerson', counts.person || 0);
 }
 
 function renderAlarms(alarms) {
@@ -616,14 +609,14 @@ async function exportHistoryCsv() {
 function renderConfig(data) {
   setText('configCollectInterval', data.collect_interval != null ? `${data.collect_interval} 秒` : EMPTY_TEXT);
   setText('configMqttMode', data.mqtt?.mode || EMPTY_TEXT);
-  setText('configAlcoholHigh', data.alarm_thresholds?.alcohol_high ?? EMPTY_TEXT);
-  setText('configMotionDelta', data.alarm_thresholds?.motion_delta ?? EMPTY_TEXT);
+  setText('configSmokeHigh', data.alarm_thresholds?.smoke_high ?? EMPTY_TEXT);
+  setText('configIntrusionCount', data.alarm_thresholds?.intrusion_count ?? EMPTY_TEXT);
   const collectInput = document.getElementById('collectIntervalInput');
-  const alcoholInput = document.getElementById('alcoholHighInput');
-  const motionInput = document.getElementById('motionDeltaInput');
+  const smokeInput = document.getElementById('smokeHighInput');
+  const intrusionInput = document.getElementById('intrusionCountInput');
   if (collectInput && data.collect_interval != null) collectInput.value = data.collect_interval;
-  if (alcoholInput && data.alarm_thresholds?.alcohol_high != null) alcoholInput.value = data.alarm_thresholds.alcohol_high;
-  if (motionInput && data.alarm_thresholds?.motion_delta != null) motionInput.value = data.alarm_thresholds.motion_delta;
+  if (smokeInput && data.alarm_thresholds?.smoke_high != null) smokeInput.value = data.alarm_thresholds.smoke_high;
+  if (intrusionInput && data.alarm_thresholds?.intrusion_count != null) intrusionInput.value = data.alarm_thresholds.intrusion_count;
 }
 
 function renderStatus(data) {
@@ -709,8 +702,8 @@ async function saveConfig() {
     const body = {
       collect_interval: numberInputValue('collectIntervalInput', 1, 3600),
       alarm_thresholds: {
-        alcohol_high: numberInputValue('alcoholHighInput', 0, 65535),
-        motion_delta: numberInputValue('motionDeltaInput', 0, 100000),
+        smoke_high: numberInputValue('smokeHighInput', 0, 65535),
+        intrusion_count: numberInputValue('intrusionCountInput', 1, 10),
       },
     };
     if (save) save.disabled = true;

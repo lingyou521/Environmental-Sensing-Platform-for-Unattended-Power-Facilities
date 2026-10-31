@@ -10,6 +10,16 @@ typedef struct datatype {
     double temp;
     double hum;
     int hum_valid;
+    /* Canonical power-facility telemetry. */
+    int smoke_raw;
+    int smoke_valid;
+    int smoke_alarm;
+    int door_open;
+    int door_valid;
+    int person_detected;
+    int person_valid;
+    int facility_alarm;
+    int alarm_level;
     double light;
     double smoke;
     int alcohol_raw;

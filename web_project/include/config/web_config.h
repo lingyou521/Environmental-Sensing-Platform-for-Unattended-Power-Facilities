@@ -6,6 +6,9 @@
 typedef struct web_config {
     int collect_interval;
     char mqtt_mode[32];
+    int smoke_high;
+    int intrusion_count;
+    /* Deprecated aliases kept for config-file compatibility. */
     int alcohol_high;
     int motion_delta;
 } web_config_t;

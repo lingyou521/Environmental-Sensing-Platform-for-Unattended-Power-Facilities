@@ -5,11 +5,31 @@ double lm75_raw_to_celsius(short raw_value)
     return raw_value * 0.5;
 }
 
+double sht30_raw_to_celsius(unsigned short raw_value)
+{
+    return -45.0 + (175.0 * (double)raw_value / 65535.0);
+}
+
+double sht30_raw_to_humidity(unsigned short raw_value)
+{
+    double humidity = 100.0 * (double)raw_value / 65535.0;
+
+    if (humidity < 0.0) {
+        return 0.0;
+    }
+    if (humidity > 100.0) {
+        return 100.0;
+    }
+    return humidity;
+}
+
 const char *temp_source_name(temp_source_t source)
 {
     switch (source) {
     case TEMP_SOURCE_LM75:
         return "lm75";
+    case TEMP_SOURCE_SHT30:
+        return "sht30";
     case TEMP_SOURCE_MOCK:
         return "mock";
     default:

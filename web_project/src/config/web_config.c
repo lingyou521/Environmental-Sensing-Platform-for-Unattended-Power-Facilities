@@ -19,8 +19,10 @@ void web_config_defaults(web_config_t *config)
     }
     config->collect_interval = 1;
     snprintf(config->mqtt_mode, sizeof(config->mqtt_mode), "ubuntu-ingest");
-    config->alcohol_high = 1800;
-    config->motion_delta = 120;
+    config->smoke_high = 1800;
+    config->intrusion_count = 2;
+    config->alcohol_high = config->smoke_high;
+    config->motion_delta = config->intrusion_count;
 }
 
 static int json_object_complete(const char *json)
@@ -191,10 +193,10 @@ static int validate_config(const web_config_t *config)
     if (config->collect_interval < 1 || config->collect_interval > 3600) {
         return -1;
     }
-    if (config->alcohol_high < 0 || config->alcohol_high > 65535) {
+    if (config->smoke_high < 0 || config->smoke_high > 65535) {
         return -1;
     }
-    if (config->motion_delta < 0 || config->motion_delta > 100000) {
+    if (config->intrusion_count < 1 || config->intrusion_count > 10) {
         return -1;
     }
     if (!valid_mqtt_mode(config->mqtt_mode)) {
@@ -222,13 +224,23 @@ int web_config_apply_json(web_config_t *config, const char *json)
     if (rc == PARSE_INVALID) return -1;
     if (rc == PARSE_OK) seen = 1;
 
-    rc = parse_int_field(json, "alcohol_high", &next.alcohol_high);
+    rc = parse_int_field(json, "smoke_high", &next.smoke_high);
     if (rc == PARSE_INVALID) return -1;
     if (rc == PARSE_OK) seen = 1;
 
-    rc = parse_int_field(json, "motion_delta", &next.motion_delta);
+    rc = parse_int_field(json, "intrusion_count", &next.intrusion_count);
     if (rc == PARSE_INVALID) return -1;
     if (rc == PARSE_OK) seen = 1;
+
+    rc = parse_int_field(json, "alcohol_high", &next.smoke_high);
+    if (rc == PARSE_INVALID) return -1;
+    if (rc == PARSE_OK) seen = 1;
+    rc = parse_int_field(json, "motion_delta", &next.intrusion_count);
+    if (rc == PARSE_INVALID) return -1;
+    if (rc == PARSE_OK) seen = 1;
+
+    next.alcohol_high = next.smoke_high;
+    next.motion_delta = next.intrusion_count;
 
     if (!seen || validate_config(&next) != 0) {
         return -1;
@@ -248,12 +260,12 @@ int web_config_to_json(const web_config_t *config, char *buffer, size_t buffer_s
     n = snprintf(buffer, buffer_size,
                  "{\"collect_interval\":%d,"
                  "\"mqtt\":{\"mode\":\"%s\"},"
-                 "\"alarm_thresholds\":{\"alcohol_high\":%d,\"motion_delta\":%d},"
+                 "\"alarm_thresholds\":{\"smoke_high\":%d,\"intrusion_count\":%d},"
                  "\"downlink\":{\"enabled\":false,\"status\":\"local-only\"}}",
                  config->collect_interval,
                  config->mqtt_mode,
-                 config->alcohol_high,
-                 config->motion_delta);
+                 config->smoke_high,
+                 config->intrusion_count);
     if (n < 0 || (size_t)n >= buffer_size) {
         return -1;
     }

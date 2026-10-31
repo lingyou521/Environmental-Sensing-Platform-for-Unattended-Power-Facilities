@@ -1,274 +1,121 @@
-# 危险品装载与驾驶舱安全监测终端
+# 无人值守电力设施环境感知平台
 
-> 基于 NXP i.MX6ULL + STM32 的 ARM Linux 综合嵌入式监测系统
+> 基于 NXP i.MX6ULL 与嵌入式 Linux 的电力设施环境监测和分级告警终端
 
-## 项目概述
+## 项目定位
 
-本项目面向危险品运输车辆，构建一套覆盖 **装载区** 和 **驾驶舱** 两条主线的安全监测终端。
-硬件上以 **NXP i.MX6ULL**（ARM Cortex-A7）为主控运行嵌入式 Linux，通过 CAN 总线挂载
-**STM32F407 / STM32F103** 节点采集传感器数据；软件上通过 LVGL 提供本地交互界面，
-MQTT 连接 OneNET 云平台，SQLite 落盘历史记录。仓库同时包含一个运行在 Ubuntu 上的
-`web_project` 管理端，用于接收 MQTT/OneNET 转发的遥测、查询历史数据和展示监控页面。
+平台面向变电箱、配电房和通信机房等无人值守场所，持续采集温湿度、烟雾、门禁和人员活动状态，在本地完成异常判断、声光告警、LCD 展示和 SQLite 记录，并通过 MQTT 将遥测上传到 Ubuntu Web 管理端。
 
-### 当前工程边界
+板端使用 i.MX6ULL ARM Cortex-A7 运行 Linux。SHT30 通过 I2C 采集温湿度，MQ-2 通过 IIO ADC 采集烟雾模拟量，门磁和 PIR 通过 Platform GPIO 驱动接入。采集、告警、显示、存储和网络上传使用 pthread + mailbox 异步解耦。
 
-| 部分 | 运行位置 | 主要职责 |
-|------|----------|----------|
-| `project/app` | i.MX6ULL ARM Linux | 采集传感器、CAN 节点通信、风险判断、本地 LVGL、SQLite、OneNET MQTT |
-| `project/drivers` | i.MX6ULL Linux 内核 | 提供 LM75、ADXL345、DHT11、MQ-3、蜂鸣器等设备节点 |
-| `stm32-firmware` | STM32F103 / STM32F407 | CAN 从节点采集与响应主站命令 |
-| `web_project` | Ubuntu 服务器 | MQTT/OneNET 数据接入、HTTP API、SQLite 历史查询、浏览器监控 |
-
-板端负责采集和上报，Ubuntu 端负责接收、缓存、落库和 Web 展示。Web 端不读取板端共享内存、
-板端设备节点或板端 SQLite。
-
-### 监测范围
-
-| 区域 | 传感器 | 监测项 |
-|------|--------|--------|
-| **主控本地采集** | LM75、ADXL345、DHT11、MQ-3、GPS | 温度、温湿度、酒精、三轴加速度、位置 |
-| **CAN 远端节点** | STM32F103 / STM32F407、DHT11、火焰传感器 | 远端温湿度、火焰状态、节点心跳与状态 |
-| **天气服务** | HTTP 天气客户端 | 天气日期、星期、城市、天气文本、温度 |
-| **Ubuntu Web** | MQTT/OneNET 转发数据 | 实时状态、历史曲线、告警记录、CSV 导出 |
-
----
-
-## 系统架构
-
-```
-┌──────────────────────────────────────────────────────┐
-│                   平台通信层                           │
-│        MQTT (OneNET) · 状态上报 · 告警推送            │
-├──────────────────────────────────────────────────────┤
-│                   本地交互层                           │
-│        LVGL LCD 显示 · 蜂鸣器 · LED · SQLite 日志     │
-├──────────────────────────────────────────────────────┤
-│                   业务逻辑层                           │
-│        数据采集调度 · 风险判定 · 分级告警              │
-├──────────────────────────────────────────────────────┤
-│                   设备抽象层                           │
-│        统一设备接口 · 数据标准化 · 状态缓存            │
-├──────────────────────────────────────────────────────┤
-│                Linux 驱动与接口层                      │
-│        GPIO · I²C · SPI · UART · ADC · CAN · Ethernet │
-├──────────────────────────────────────────────────────┤
-│                     感知层                            │
-│        传感器阵列  +  STM32 CAN 节点                  │
-└──────────────────────────────────────────────────────┘
-```
-
-### 硬件拓扑
-
-```
-                  ┌─────────────┐
-                  │  OneNET 云   │
-                  └──────┬──────┘
-                    MQTT │  平台数据流转 / API
-             ┌───────────┴───────────┐
-             │                       │
-      ┌──────┴──────┐         ┌──────┴──────┐
-      │  i.MX6ULL   │         │ Ubuntu Web  │
-      │  ARM Linux  │         │ web_project │
-      │ LVGL+SQLite │         │ HTTP+SQLite │
-      └──────┬──────┘         └─────────────┘
-                         │ CAN 500kbps
-          ┌──────────────┼──────────────┐
-          │              │              │
-    ┌─────┴─────┐  ┌─────┴─────┐  其他节点
-    │ STM32F407 │  │ STM32F103 │
-    │ node=0x02 │  │ node=0x01 │
-    └───────────┘  └───────────┘
-```
-
----
-
-## 目录结构
-
-```
-linux-projects/
-│
-├── project/                           # Linux 主应用工程
-│   ├── app/
-│   │   ├── src/core/                  # 线程调度 (mailbox) · 日志 · 链表队列
-│   │   ├── src/device/                # 传感器抽象层 (sensor_lm75 / adxl345 / dht11 / mq3)
-│   │   ├── src/comm/                  # CAN 协议栈 · MQTT 客户端
-│   │   ├── src/service/               # 业务逻辑：collect 数据采集 · weather 天气
-│   │   ├── src/storage/               # SQLite 封装
-│   │   ├── src/ui/                    # LVGL 用户界面 (lvgl_user)
-│   │   ├── include/                   # 头文件 (MQTT / OpenSSL / SQLite / cJSON / 项目配置)
-│   │   ├── third_party/               # LVGL v8 · LVGL Drivers
-│   │   ├── ui/                        # 界面资源 (screens / fonts / images)
-│   │   └── tests/                     # 单元测试代码
-│   ├── drivers/                       # Linux 内核 misc 设备驱动
-│   │   ├── lm75_drv/                  # LM75 I²C 温度传感器
-│   │   ├── adxl345_drv/               # ADXL345 SPI 三轴加速度计
-│   │   ├── dht11_drv/                 # DHT11 温湿度 (platform + GPIO)
-│   │   ├── mq3_drv/                   # MQ-3 酒精传感器 (IIO ADC)
-│   │   └── beep_drv/                  # 蜂鸣器 (GPIO)
-│   ├── lib/                           # 交叉编译依赖库
-│   │   ├── libpaho-mqtt3*.so          # Paho MQTT C 客户端
-│   │   ├── libsqlite3.so              # SQLite3
-│   │   └── libcrypto.so / libssl.so   # OpenSSL
-│   ├── docs/                          # 驱动设计文档 & 验证说明
-│   └── Makefile                       # 顶层构建入口
-│
-├── web_project/                       # Ubuntu Web 管理端
-│   ├── src/                           # C HTTP 服务、接入、缓存、SQLite
-│   ├── include/                       # Web 后端头文件
-│   ├── scripts/mqtt_forward.sh        # MQTT payload 转 HTTP ingest
-│   ├── www/                           # 登录、实时、历史、告警、配置页面
-│   ├── tests/                         # payload/cache 与 Web 配置测试
-│   ├── README.md                      # Web 端部署与接口说明
-│   └── web-server-design.md           # Web 架构设计文档
-│
-├── stm32-firmware/                    # STM32 CAN 节点固件
-│   ├── F407/                          # STM32F407ZGTx (Cortex-M4)
-│   │   ├── Core/Inc/ & Src/           # HAL 应用层 (can.c / main.c / usart.c / stm32f4xx_it.c)
-│   │   ├── Drivers/CMSIS + HAL        # STM32F4 标准库
-│   │   ├── MDK-ARM/                   # Keil 工程 (.uvprojx)
-│   │   ├── tests/                     # Python 源码契约测试
-│   │   └── docs/                      # 设计文档 & 实现计划
-│   └── UART/                          # STM32F103C8T6 (Cortex-M3)
-│       ├── Core/                      # 同上结构
-│       ├── Drivers/                   # STM32F1 标准库
-│       ├── MDK-ARM/                   # Keil 工程
-│       └── tests/                     # Python 源码契约测试
-│
-├── CAN/                               # CAN 总线入门实验
-│   ├── 01-CAN总线单个设备环回测试/     # 单节点 CAN 环回 (STM32F103)
-│   └── 02-CAN总线三个设备互相通信/     # 三节点 CAN 互通信
-│
-├── 传感器驱动/                         # 独立传感器驱动模块 (含 DTS + 用户态测试程序)
-│   ├── 08-beep_misc_drv_dts/          # 蜂鸣器
-│   ├── 13-lm75_i2c/                   # LM75
-│   ├── 14-adxl345_spi/                # ADXL345
-│   ├── 17-platform_dht11/             # DHT11
-│   ├── 18-gps/                        # GPS
-│   ├── MQ-3/                          # MQ-3 酒精传感器 (IIO ADC)
-│   │   ├── mq3_drv/                    # 内核驱动 (platform + iio_channel_get)
-│   │   └── mq3_app/                    # 用户态验证程序
-│   └── MPU6050/                        # MPU6050 六轴传感器 (预留 I²C)
-│
-├── lv_mqtt_SQ_pthread/                # 早期 MQTT + LVGL + SQLite 原型
-├── 天气/                              # HTTP 天气 API 客户端 (api.k780.com)
-├── 日志/                              # 独立分级日志模块 (TRACE → FATAL)
-├── MQTT/                              # MQTT 基础连接测试
-├── 日志/                               # 分级日志模块与项目开发记录
-└── GPS/                               # GPS 预留
-```
-
----
-
-## 主应用线程模型
-
-```c
-main()
-  │
-  ├── mailbox_init()                    // 初始化线程调度器
-  │
-  ├── collect_thread()                  // [采集] 轮询传感器字符设备，解析原始数据
-  ├── weather_thread()                  // [天气] HTTP GET → cJSON 解析 → 气象数据
-  ├── lvgl_thread()                     // [界面] LVGL 定时刷新，渲染 LCD
-  ├── sqlite_thread()                   // [存储] 接收数据 → SQLite INSERT / 定期清理
-  ├── mqtt_thread()                     // [云端] MQTT connect → publish 状态 → subscribe 指令
-  └── can_thread()                      // [总线] CAN 帧收发 → 协议编解码 → 节点管理
-         │
-         └── mailbox_waitall_thread_end()
-```
-
-线程间通过 `mailbox + linkqueue` 实现消息传递，无锁化生产者-消费者模型。
-
-### Ubuntu Web 数据链路
+## 功能链路
 
 ```text
-设备端 / OneNET
-      │ MQTT 或平台数据流转
-      ▼
-Ubuntu Mosquitto / OneNET 转发
-      │ mosquitto_sub + mqtt_forward.sh
-      ▼
-POST /ingest/telemetry 或 /ingest/onenet
-      │
-      ├── realtime cache  ──► GET /api/realtime
-      ├── SQLite            ──► history / alarms / export
-      └── HTTP static UI    ──► login / dashboard / history / config
+SHT30(I2C)       MQ-2(IIO ADC)       门磁/PIR(GPIO)
+       \             |                  /
+        \            |                 /
+         i.MX6ULL Linux 主控采集线程
+              |             |
+       分级告警判断       SQLite 本地记录
+              |             |
+       LVGL LCD + 蜂鸣器/LED
+              |
+        MQTT 遥测上报
+              |
+     Ubuntu Web 实时监控/历史/告警
 ```
 
-`web_project` 当前没有内置 MQTT C 客户端，Ubuntu 端通过
-`web_project/scripts/mqtt_forward.sh` 将 MQTT 消息转发到 C Web 后端。
-完整部署、Token、systemd 和接口示例见 [`web_project/README.md`](web_project/README.md)。
+### 采集与告警规则
 
----
+| 模块 | 设备节点 | 采集内容 | 告警条件 |
+| --- | --- | --- | --- |
+| SHT30 | `/dev/sht30_misc` | 温度、相对湿度 | 数据失联记录故障 |
+| MQ-2 | `/dev/mq2_misc` | ADC 原始值 | 连续 3 次超过烟雾阈值 |
+| 门磁 | `/dev/door_misc` | 门开/关 | 无人值守时检测到开门 |
+| PIR | `/dev/pir_misc` | 人体活动 | 检测到人员活动 |
+| 声光输出 | `/dev/beep_misc` | 蜂鸣器控制 | 综合告警时联动 |
 
-## Linux 内核驱动
+烟雾告警使用 `SMOKE_ALARM_THRESHOLD`，门磁和 PIR 事件进入统一的设施告警状态机。告警需要连续确认，恢复需要连续清除，避免单次抖动造成误报。
 
-所有传感器驱动基于 **misc 设备框架**，提供标准的 `/dev/*` 字符设备接口，
-用户态通过 `open()` / `read()` / `write()` / `ioctl()` 访问：
+## 目录
 
-| 驱动 | 总线 | 设备节点 | 用户态 read() 返回 |
-|------|------|---------|--------------------|
-| LM75 | I²C | `/dev/lm75_misc` | 2 字节原始温度值 |
-| ADXL345 | SPI | `/dev/adxl345_misc` | 3 × `short`（x, y, z 轴加速度） |
-| DHT11 | Platform + GPIO | `/dev/dht11_misc` | 5 字节原始帧（湿度+温度+校验） |
-| MQ-3 | IIO ADC | `/dev/mq3_misc` | `int` 原始 ADC 采样值 |
-| BEEP | GPIO | `/dev/beep_misc` | write() 非零=开，零=关 |
-| **MPU6050** | I²C | `/dev/mpu6050_misc` | 6 × `short`（accel x/y/z + gyro x/y/z） |
+```text
+project/
+├── app/
+│   ├── src/core/       # pthread mailbox、链表队列、日志
+│   ├── src/device/     # SHT30、MQ-2、门磁、PIR、蜂鸣器用户态封装
+│   ├── src/service/    # 采集调度与告警状态机
+│   ├── src/comm/       # MQTT 上报
+│   ├── src/storage/    # SQLite 历史记录
+│   ├── src/ui/         # LVGL 本地界面
+│   ├── include/        # 数据模型、配置和第三方头文件
+│   ├── drivers/        # Linux misc/platform/I2C/IIO 驱动
+│   └── Makefile
+├── web_project/        # Ubuntu C Web 服务和静态监控页面
+├── 传感器驱动/          # 独立驱动练习和设备树资料
+├── stm32-firmware/     # 保留的 STM32 外设实验代码，不参与本项目主流程
+├── 日志/                # 开发记录与面试说明
+└── skills/              # 驱动生成、源码契约检查工具
+```
 
-> 详细设计见 [project/docs/driver-design.md](project/docs/driver-design.md)
+## 主控线程模型
 
----
+```text
+main
+ ├── collect_thread  -> 读取四类传感器，执行告警状态机
+ ├── lvgl_thread     -> framebuffer/触摸屏刷新本地页面
+ ├── sqlite_thread   -> 写入 sensor_history.db
+ └── mqtt_thread     -> MQTT 连接、重连、遥测发布
+```
 
-## CAN 总线协议
+线程之间通过 `mailbox + linkqueue` 传递不可变采样快照，避免使用全局变量传递半更新状态。采样快照同时发给显示、存储和上传线程，任一线程短暂阻塞都不会改变其他线程的采集节奏。
 
-**物理层：** CAN 2.0A, 500 kbps, 11-bit 标准帧 ID  
-**拓扑：** i.MX6ULL 做主站轮询，STM32F407/F103 做从站响应  
-**收发器：** TJA1050
+## Linux 驱动接口
 
-### 帧 ID 分配
+所有板端驱动使用 misc 设备提供简单的字符设备接口：
 
-| 帧类型 | ID 范围 | 方向 | 说明 |
-|--------|---------|------|------|
-| 心跳帧 | `0x100 + node_id` | 从→主 | 节点定时发送，带状态字 |
-| 命令帧 | `0x300 + node_id` | 主→从 | PING / 读取状态 / 配置参数 |
-| 应答帧 | `0x200 + node_id` | 从→主 | 命令执行结果返回 |
+| 驱动 | 总线/框架 | 用户态 `read()` |
+| --- | --- | --- |
+| `sht30_drv` | I2C | 两个 `uint16_t` 原始值：温度、湿度 |
+| `mq2_drv` | IIO ADC + Platform | 一个 `int` ADC 原始值 |
+| `door_drv` | GPIO descriptor + Platform | 一个 `int`：0 关闭，1 打开 |
+| `pir_drv` | GPIO descriptor + Platform | 一个 `int`：0 无人，1 检测到 |
+| `beep_drv` | GPIO | `write(int)` 控制开关 |
 
-### 节点 ID
+设备树节点使用以下兼容字符串：
 
-| 节点 | ID | 平台 |
-|------|----|------|
-| F103 最小系统 | `0x01` | STM32F103C8T6 |
-| F407 扩展节点 | `0x02` | STM32F407ZGTx |
+```dts
+compatible = "power,sht30";
+compatible = "power,mq2";
+compatible = "power,door-sensor";
+compatible = "power,pir-sensor";
+```
 
----
+## 构建
 
-## 构建与运行
+### i.MX6ULL 主应用和驱动
 
-### 前置依赖
-
-| 组件 | 用途 | 版本/说明 |
-|------|------|----------|
-| `arm-linux-gnueabihf-gcc` | 交叉编译 Linux 应用 | Linaro / Buildroot 工具链 |
-| Linux Kernel (i.MX6ULL) | 编译内核驱动 | 需配置好内核源码树 |
-| Paho MQTT C | MQTT 客户端库 | 预编译在 `project/lib/` |
-| SQLite3 | 嵌入式数据库 | 预编译在 `project/lib/` |
-| OpenSSL | TLS 加密 | 预编译在 `project/lib/` |
-| STM32CubeMX 6.0.1 | STM32 HAL 代码生成 | F1 / F4 系列 |
-| Keil MDK-ARM V5 | STM32 固件编译 | ARM Compiler 5/6 |
-
-### 编译 Linux 主应用
+需要准备 `arm-linux-gnueabihf-gcc`、目标 Linux 内核源码、LVGL、SQLite3、Paho MQTT C 和 OpenSSL：
 
 ```bash
 cd project
-make all          # 编译 app + 全部 5 个内核驱动
-make clean        # 清理
+make all
+make test
+make clean
 ```
 
-主应用 Makefile 默认使用 `arm-linux-gnueabihf-gcc`，并链接 LVGL、SQLite、Paho MQTT C、
-OpenSSL 和目标 RootFS 中的运行库。未安装交叉工具链时，`make` 会在解析阶段停止。
+驱动的内核源码路径和 NFS 根文件系统路径可通过 `KERNEL_DIR`、`ROOTFS_DIR` 覆盖。主应用默认安装到 `~/nfs/rootfs`，设备端运行前需要创建 `/dev/sht30_misc`、`/dev/mq2_misc`、`/dev/door_misc`、`/dev/pir_misc` 和 `/dev/beep_misc`。
 
-### 编译 Ubuntu Web 管理端
+MQTT 密码不再写入源码，运行时设置：
 
 ```bash
+export POWER_MQTT_PASSWORD='设备或平台提供的密码'
+```
+
+### Ubuntu Web 管理端
+
+```bash
+sudo apt install -y build-essential make libsqlite3-dev sqlite3 curl mosquitto-clients
 cd web_project
 make clean
 make
@@ -276,149 +123,70 @@ make test
 ./bin/webserver -p 8080 -r ./www --db ./sensor_history.db --config ./web_config.json
 ```
 
-默认 Web 服务只监听 `127.0.0.1`。需要局域网访问时，必须显式设置绑定地址，并同时启用后端 Token：
+Web 端默认监听 `127.0.0.1`。局域网联调时显式设置绑定地址和后端 Token：
 
 ```bash
 export SENSOR_WEB_BIND=0.0.0.0
 export SENSOR_WEB_TOKEN='换成一段长随机字符串'
-make -C web_project run
 ```
 
-浏览器访问 `http://Ubuntu服务器IP:8080/login.html`。Web 端默认登录仅是前端演示门禁，
-真正的 API 和数据写入保护由 `SENSOR_WEB_TOKEN` 提供。
+访问 `http://服务器IP:8080/login.html`。登录页是演示门禁，真正的 API 和数据写入保护依赖后端 Token。
 
-### 编译 STM32 固件
+## Web 接口
 
-```bash
-# F407 节点
-# 1. 打开 stm32-firmware/F407/F407.ioc → Generate Code
-# 2. Keil 打开 stm32-firmware/F407/MDK-ARM/F407.uvprojx → Build
+```text
+GET  /api/realtime
+     返回最近一次设施快照：温湿度、烟雾、门磁、人员和综合告警。
 
-# F103 节点
-# 1. 打开 stm32-firmware/UART/UART.ioc → Generate Code
-# 2. Keil 打开 stm32-firmware/UART/MDK-ARM/UART.uvprojx → Build
+GET  /api/history?sensor=temperature&limit=100
+     查询 temperature、humidity、smoke_raw、door_open、person_detected、facility_alarm 等趋势。
+
+GET  /api/alarms?limit=50
+     查询烟雾、门磁和人员入侵事件。
+
+GET  /api/export?sensor=smoke_raw&limit=1000
+     导出历史 CSV。
+
+GET/PUT /api/config
+     读取或保存采集周期、烟雾阈值和入侵确认次数。
+
+POST /ingest/telemetry
+     接收扁平 JSON 遥测。
 ```
 
-### 运行 Python 契约测试
+示例遥测：
 
-源码级别的协议一致性验证，不依赖硬件：
-
-```bash
-cd stm32-firmware/F407
-python -m unittest tests.test_can_multinode_source_contracts -v
-
-cd stm32-firmware/UART
-python -m unittest tests.test_can_source_contracts -v
+```json
+{
+  "device": "power_facility_01",
+  "timestamp": 1719849600,
+  "temperature": 24.5,
+  "humidity": 48.0,
+  "smoke_raw": 420,
+  "smoke_alarm": false,
+  "door_open": false,
+  "person_detected": false,
+  "facility_alarm": false,
+  "alarm_level": 0
+}
 ```
 
-### 测试范围
+MQTT 转发仍由 `scripts/mqtt_forward.sh` 配合 `mosquitto_sub + curl` 完成。Web 后端不直接读取板端设备节点或板端 SQLite。
 
-```bash
-# Linux 主应用源码级单元测试，需要主应用交叉编译器
-make -C project/app test
+## 验证范围
 
-# STM32 CAN 源码契约测试
-cd stm32-firmware/F407
-python -m unittest tests.test_can_multinode_source_contracts -v
-cd ../../
-cd stm32-firmware/UART
-python -m unittest tests.test_can_source_contracts -v
-cd ../../
+- `project/app`：传感器换算、日志和基础队列单元测试。
+- `web_project`：JSON 解析、设施告警字段、实时缓存、SQLite payload/cache 和配置保存测试。
+- `stm32-firmware`：保留 CAN 源码契约测试，但不属于电力设施平台主链路。
 
-# Ubuntu Web payload/cache 与配置测试
-make -C web_project test
-```
+当前没有真实 i.MX6ULL、GPIO、I2C、ADC 到 MQTT 再到浏览器的硬件端到端测试；部署到目标板后应补充设备树、驱动 probe、断线重连和告警恢复验证。
 
-当前仓库还没有覆盖真实硬件到 MQTT、Ubuntu ingest、SQLite 和浏览器页面的完整端到端测试。
+## 安全边界
 
----
-
-## 项目专属 Skills
-
-本项目提供了两个 Claude Code 专属技能，用于提升开发效率。
-
-### /new-driver - 驱动开发助手
-
-快速生成符合项目规范的 misc 设备驱动模块。
-
-```bash
-/new-driver lm75          # 生成 LM75 I2C 温度传感器驱动
-/new-driver adxl345       # 生成 ADXL345 SPI 加速度计驱动
-/new-driver dht11         # 生成 DHT11 温湿度驱动
-/new-driver beep          # 生成蜂鸣器 GPIO 驱动
-```
-
-**功能：**
-- 自动检测总线类型 (I2C/SPI/GPIO/IIO)
-- 生成完整目录结构：驱动、测试程序、Makefile
-- 自动递增编号，避免冲突
-- 支持交叉编译工具链
-
-**生成内容：**
-```
-传感器驱动/<编号>-<名称>/
-├── <名称>_drv/          # 驱动源码 + Makefile
-├── <名称>_app/          # 测试程序 + Makefile
-└── README.md            # 使用说明
-```
-
-### /can-debug - CAN 协议调试
-
-分析 CAN 总线通信，验证协议一致性。
-
-```bash
-/can-debug log <文件>        # 解析 candump 日志文件
-/can-debug dump <接口>       # 实时抓取 CAN 帧
-/can-debug verify <节点>     # 验证 STM32 节点协议一致性
-/can-debug test              # 运行 Python 契约测试
-```
-
-**功能：**
-- 解析 candump 日志，输出可读格式
-- 验证帧 ID 分配 (0x100/0x200/0x300)
-- 检查心跳间隔、数据长度
-- 运行 Python 源码级契约测试
-
-**验证项：**
-- 帧 ID 是否符合协议规范
-- 心跳间隔是否稳定 (1s)
-- 命令-应答是否对应
-- 数据域长度是否为 8 字节
-
-### Skill 文件位置
-
-```
-skills/
-├── new-driver/
-│   ├── SKILL.md
-│   └── scripts/
-│       └── generate.sh
-└── can-debug/
-    ├── SKILL.md
-    └── scripts/
-        ├── parse_candump.py
-        └── verify_can.py
-```
-
----
-
-## 相关文档
-
-- [系统设计说明](危险品装载与驾驶舱安全监测终端项目说明.md)
-- [驱动设计文档](project/docs/driver-design.md)
-- [驱动验证说明](project/docs/driver-validation.md)
-- [CAN 多节点方案设计](stm32-firmware/F407/docs/superpowers/specs/2026-05-16-imx6ull-can-multinode-design.md)
-- [项目进度日志](日志/项目开发日志/progress.md)
-- [Ubuntu Web 端说明](web_project/README.md)
-- [Ubuntu Web 端架构设计](web_project/web-server-design.md)
-
-## 当前限制与上线注意
-
-- `project/app/include/config/app_config.h` 中仍包含 OneNET 连接参数，生产部署应迁移到外部配置或密钥管理，并及时轮换已暴露凭据。
-- `web_project` 的 MQTT 接入依赖外部转发脚本，长期运行建议使用 systemd、日志和失败重启策略。
-- Web 后端目前适合内网联调和演示；公网部署前需要 HTTPS、可信 CORS、设备签名或网关鉴权、速率限制和防重放。
-- 部分 Web 遥测 payload 缺字段时会按默认值写入，后续应增加字段 presence 标记或合并最近完整样本。
-- 主应用、内核驱动、STM32 固件和 Ubuntu Web 端是不同构建目标，不能用同一个编译器或同一个 `make` 入口替代。
+- MQTT 凭据必须通过环境变量或设备侧密钥注入，禁止提交到 Git。
+- Web 公网部署前必须增加 HTTPS、可靠登录、CSRF 防护、限流和请求签名。
+- `/ingest/telemetry` 只接受受信任转发源；生产环境应增加设备身份和防重放校验。
+- 轻量 JSON 解析器适合固定字段联调，不应直接作为公网不可信 JSON 边界。
 
 ## 许可证
 

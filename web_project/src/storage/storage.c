@@ -367,6 +367,12 @@ int storage_insert_sample(storage_t *storage, const device_sample_t *s)
     const sensor_value_t values[] = {
         {"temperature", s ? s->temperature : 0.0},
         {"humidity", s ? s->humidity : 0.0},
+        {"smoke_raw", s ? (double)s->smoke_raw : 0.0},
+        {"smoke_alarm", s ? (double)s->smoke_alarm : 0.0},
+        {"door_open", s ? (double)s->door_open : 0.0},
+        {"person_detected", s ? (double)s->person_detected : 0.0},
+        {"facility_alarm", s ? (double)s->facility_alarm : 0.0},
+        {"alarm_level", s ? (double)s->alarm_level : 0.0},
         {"alcohol_raw", s ? (double)s->alcohol_raw : 0.0},
         {"alcohol_level", s ? (double)s->alcohol_level : 0.0},
         {"alcohol_alarm", s ? (double)s->alcohol_alarm : 0.0},
@@ -716,11 +722,11 @@ int storage_alarms_json(storage_t *storage, int limit, char *buffer, size_t buff
         char message[160];
 
         if (alcohol_alarm && emitted < limit) {
-            snprintf(message, sizeof(message), "Alcohol alarm raw=%d level=%d",
+            snprintf(message, sizeof(message), "Smoke alarm raw=%d level=%d",
                      alcohol_raw, alcohol_level);
             if (append_alarm_event(buffer, buffer_size, &len, &first,
-                                   sample_id, 1, ts, device, "alcohol",
-                                   "alcohol_raw",
+                                   sample_id, 1, ts, device, "smoke",
+                                   "smoke_raw",
                                    alcohol_level >= 2 ? "error" : "warning",
                                    message) != 0) {
                 goto fail;
@@ -728,12 +734,12 @@ int storage_alarms_json(storage_t *storage, int limit, char *buffer, size_t buff
             emitted++;
         }
         if (motion_alarm && emitted < limit) {
-            snprintf(message, sizeof(message),
-                     "Motion alarm state=%d accel=(%d,%d,%d)",
-                     motion_state, accel_x, accel_y, accel_z);
+            snprintf(message, sizeof(message), "Facility access alarm state=%d", motion_state);
             if (append_alarm_event(buffer, buffer_size, &len, &first,
-                                   sample_id, 2, ts, device, "motion",
-                                   "motion_state", "warning", message) != 0) {
+                                   sample_id, motion_state == 1 ? 2 : 3, ts, device,
+                                   motion_state == 1 ? "door" : "person",
+                                   motion_state == 1 ? "door_open" : "person_detected",
+                                   "warning", message) != 0) {
                 goto fail;
             }
             emitted++;

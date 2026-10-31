@@ -160,12 +160,13 @@ static int mqtt_runtime_init(mqtt_runtime_t *runtime)
 static int mqtt_runtime_connect(mqtt_runtime_t *runtime)
 {
     MQTTClient_connectOptions conn_opts = MQTTClient_connectOptions_initializer;
+    const char *password = getenv(MQTT_PASSWORD_ENV);
     int rc = 0;
 
     conn_opts.keepAliveInterval = 20;
     conn_opts.cleansession = 1;
     conn_opts.username = MQTT_PRODUCT_ID;
-    conn_opts.password = MQTT_PASSWORD;
+    conn_opts.password = password == NULL ? "" : password;
 
     runtime->last_connect_attempt = time(NULL);
     LOG_INFO("mqtt connecting broker=%s client_id=%s username=%s",
@@ -193,109 +194,45 @@ static int mqtt_runtime_connect(mqtt_runtime_t *runtime)
     return 0;
 }
 
-static int mqtt_publish_temperature(mqtt_runtime_t *runtime, const data_t *sample)
+static int mqtt_publish_sample(mqtt_runtime_t *runtime, const data_t *sample)
 {
     MQTTClient_deliveryToken delivery_token;
     MQTTClient_message message = MQTTClient_message_initializer;
     char payload[2048];
-    char weather_day[WEATHER_FIELD_LEN * 2];
-    char weather_week[WEATHER_FIELD_LEN * 2];
-    char weather_city[WEATHER_FIELD_LEN * 2];
-    char weather_text[WEATHER_FIELD_LEN * 2];
-    char weather_temp[WEATHER_FIELD_LEN * 2];
     char params[1024];
     int rc = 0;
     static int message_id = 10000;
-    int temp_value = 0;
-
-    temp_value = (int)lround(sample->temp);
-
-    snprintf(params, sizeof(params), "\"%s\":{\"value\":%d}", MQTT_TEMP_KEY, temp_value);
+    snprintf(params, sizeof(params), "\"%s\":{\"value\":%.2f}",
+             MQTT_TEMP_KEY, sample->temp);
 
     if (sample->hum_valid) {
         snprintf(params + strlen(params),
                  sizeof(params) - strlen(params),
                  ",\"%s\":{\"value\":%d}",
                  MQTT_HUMIDITY_KEY,
-                 (int)lround(sample->hum));
+                 sample->hum);
     }
 
-    if (sample->alcohol_valid) {
-        snprintf(params + strlen(params),
-                 sizeof(params) - strlen(params),
-                 ",\"%s\":{\"value\":%d}",
-                 MQTT_ALCOHOL_KEY,
-                 sample->alcohol_raw);
-    }
-
-    if (sample->accel_valid) {
-        snprintf(params + strlen(params),
-                 sizeof(params) - strlen(params),
-                 ",\"%s\":{\"value\":%d},\"%s\":{\"value\":%d},\"%s\":{\"value\":%d},\"%s\":{\"value\":%d}",
-                 MQTT_ACCEL_X_KEY,
-                 sample->accel_x,
-                 MQTT_ACCEL_Y_KEY,
-                 sample->accel_y,
-                 MQTT_ACCEL_Z_KEY,
-                 sample->accel_z,
-                 MQTT_MOTION_STATE_KEY,
-                 sample->motion_state);
-    }
-
-    if (sample->weather_valid) {
-        mqtt_escape_json_string(sample->weather_day, weather_day, sizeof(weather_day));
-        mqtt_escape_json_string(sample->weather_week, weather_week, sizeof(weather_week));
-        mqtt_escape_json_string(sample->weather_city, weather_city, sizeof(weather_city));
-        mqtt_escape_json_string(sample->weather_text, weather_text, sizeof(weather_text));
-        mqtt_escape_json_string(sample->weather_temp, weather_temp, sizeof(weather_temp));
-        snprintf(params + strlen(params),
-                 sizeof(params) - strlen(params),
-                 ",\"%s\":{\"value\":\"%s\"},\"%s\":{\"value\":\"%s\"},\"%s\":{\"value\":\"%s\"},\"%s\":{\"value\":\"%s\"},\"%s\":{\"value\":\"%s\"}",
-                 MQTT_WEATHER_DAY_KEY,
-                 weather_day,
-                 MQTT_WEATHER_WEEK_KEY,
-                 weather_week,
-                 MQTT_WEATHER_CITY_KEY,
-                 weather_city,
-                 MQTT_WEATHER_TEXT_KEY,
-                 weather_text,
-                 MQTT_WEATHER_TEMP_KEY,
-                 weather_temp);
-    }
-
-    /* CAN sensor data from remote STM32 nodes */
-    if (sample->dht11_valid) {
+    if (sample->smoke_valid) {
         snprintf(params + strlen(params),
                  sizeof(params) - strlen(params),
                  ",\"%s\":{\"value\":%d},\"%s\":{\"value\":%d}",
-                 MQTT_DHT11_HUM_KEY,
-                 sample->dht11_humidity,
-                 MQTT_DHT11_TEMP_KEY,
-                 sample->dht11_temperature);
+                 MQTT_SMOKE_KEY, sample->smoke_raw,
+                 MQTT_SMOKE_ALARM_KEY, sample->smoke_alarm);
     }
 
-    if (sample->flame_valid) {
+    if (sample->door_valid) {
         snprintf(params + strlen(params),
                  sizeof(params) - strlen(params),
-                 ",\"%s\":{\"value\":%d}",
-                 MQTT_FLAME_KEY,
-                 sample->flame_status);
+                 ",\"%s\":{\"value\":%d}", MQTT_DOOR_KEY, sample->door_open);
     }
-
-    /* GPS data */
-    if (sample->gps_valid) {
+    if (sample->person_valid) {
         snprintf(params + strlen(params),
                  sizeof(params) - strlen(params),
-                 ",\"%s\":{\"value\":%.6f},\"%s\":{\"value\":%.6f},"
-                 "\"%s\":{\"value\":%.1f},\"%s\":{\"value\":%.1f},"
-                 "\"%s\":{\"value\":%d},\"%s\":{\"value\":%d}",
-                 MQTT_GPS_LAT_KEY, sample->gps_latitude,
-                 MQTT_GPS_LON_KEY, sample->gps_longitude,
-                 MQTT_GPS_ALT_KEY, sample->gps_altitude,
-                 MQTT_GPS_SPEED_KEY, sample->gps_speed,
-                 MQTT_GPS_SAT_KEY, sample->gps_satellites,
-                 MQTT_GPS_FENCE_KEY, sample->gps_fence_alarm);
+                 ",\"%s\":{\"value\":%d}", MQTT_PERSON_KEY, sample->person_detected);
     }
+    snprintf(params + strlen(params), sizeof(params) - strlen(params),
+             ",\"%s\":{\"value\":%d}", MQTT_FACILITY_ALARM_KEY, sample->facility_alarm);
 
     snprintf(payload,
              sizeof(payload),
@@ -377,7 +314,7 @@ void *mqtt_thread(void *arg)
             continue;
         }
 
-        if (mqtt_publish_temperature(&runtime, &sample) != 0) {
+        if (mqtt_publish_sample(&runtime, &sample) != 0) {
             runtime.connected = 0;
         }
     }

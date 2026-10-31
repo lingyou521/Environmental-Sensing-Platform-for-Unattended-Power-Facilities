@@ -8,6 +8,12 @@ typedef struct device_sample {
     uint64_t timestamp;
     double temperature;
     double humidity;
+    int smoke_raw;
+    int smoke_alarm;
+    int door_open;
+    int person_detected;
+    int facility_alarm;
+    int alarm_level;
     int alcohol_raw;
     int alcohol_level;
     int alcohol_alarm;

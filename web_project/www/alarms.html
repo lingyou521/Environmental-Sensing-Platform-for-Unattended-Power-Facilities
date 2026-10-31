@@ -3,15 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>告警记录 - 危运安全监控平台</title>
+  <title>告警记录 - 电力设施环境感知平台</title>
   <link rel="stylesheet" href="/assets/css/style.css">
 </head>
 <body class="app-page" data-page="alarms">
   <div class="app-shell">
     <aside class="sidebar">
       <div class="sidebar-brand">
-        <div class="brand-mark">危</div>
-        <div><strong>危运安全</strong><span>Ubuntu 监控端</span></div>
+        <div class="brand-mark">电</div>
+        <div><strong>电力设施感知</strong><span>Ubuntu 监控端</span></div>
       </div>
       <nav class="side-nav" aria-label="主导航">
         <a href="/index.html" data-nav="dashboard">实时监控</a>
@@ -25,7 +25,7 @@
       <header class="workspace-head">
         <div>
           <h1>告警记录</h1>
-          <p>集中查看酒精超限、振动异常、火焰和电子围栏事件</p>
+          <p>集中查看烟雾、门禁和人员入侵事件</p>
         </div>
         <div class="head-status">
           <span id="alarmStatus" class="muted">等待刷新</span>
@@ -33,9 +33,9 @@
       </header>
       <section class="summary-strip alarm-summary">
         <div><span>总告警</span><strong id="alarmTotal">0</strong></div>
-        <div><span>酒精</span><strong id="alarmAlcohol">0</strong></div>
-        <div><span>振动/围栏</span><strong><span id="alarmMotion">0</span>/<span id="alarmGeofence">0</span></strong></div>
-        <div><span>火焰</span><strong id="alarmFlame">0</strong></div>
+        <div><span>烟雾</span><strong id="alarmSmoke">0</strong></div>
+        <div><span>门磁</span><strong id="alarmDoor">0</strong></div>
+        <div><span>人员</span><strong id="alarmPerson">0</strong></div>
       </section>
       <section class="panel">
         <div class="panel-head">
@@ -43,10 +43,9 @@
           <div class="panel-actions">
             <select id="alarmFilter" aria-label="告警类型筛选">
               <option value="all">全部类型</option>
-              <option value="alcohol">酒精</option>
-              <option value="motion">振动</option>
-              <option value="geofence">围栏</option>
-              <option value="flame">火焰</option>
+              <option value="smoke">烟雾</option>
+              <option value="door">门磁</option>
+              <option value="person">人员</option>
             </select>
             <button id="refreshAlarms" type="button">刷新记录</button>
           </div>

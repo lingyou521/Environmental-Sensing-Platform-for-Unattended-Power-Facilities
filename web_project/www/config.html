@@ -3,15 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>系统配置 - 危运安全监控平台</title>
+  <title>系统配置 - 电力设施环境感知平台</title>
   <link rel="stylesheet" href="/assets/css/style.css">
 </head>
 <body class="app-page" data-page="config">
   <div class="app-shell">
     <aside class="sidebar">
       <div class="sidebar-brand">
-        <div class="brand-mark">危</div>
-        <div><strong>危运安全</strong><span>Ubuntu 监控端</span></div>
+        <div class="brand-mark">电</div>
+        <div><strong>电力设施感知</strong><span>Ubuntu 监控端</span></div>
       </div>
       <nav class="side-nav" aria-label="主导航">
         <a href="/index.html" data-nav="dashboard">实时监控</a>
@@ -34,8 +34,8 @@
       <section class="summary-strip">
         <div><span>采集周期</span><strong id="configCollectInterval">--</strong></div>
         <div><span>MQTT 模式</span><strong id="configMqttMode">--</strong></div>
-        <div><span>酒精阈值</span><strong id="configAlcoholHigh">--</strong></div>
-        <div><span>振动阈值</span><strong id="configMotionDelta">--</strong></div>
+        <div><span>烟雾阈值</span><strong id="configSmokeHigh">--</strong></div>
+        <div><span>入侵确认</span><strong id="configIntrusionCount">--</strong></div>
       </section>
       <section class="config-grid">
         <article class="panel">
@@ -46,8 +46,8 @@
           <h2>本地配置</h2>
           <form class="config-form">
             <label><span>采集周期</span><input id="collectIntervalInput" type="number" min="1" max="3600" value="1"><small>秒</small></label>
-            <label><span>酒精高阈值</span><input id="alcoholHighInput" type="number" min="0" max="65535" value="1800"><small>raw</small></label>
-            <label><span>振动阈值</span><input id="motionDeltaInput" type="number" min="0" max="100000" value="120"><small>delta</small></label>
+            <label><span>烟雾高阈值</span><input id="smokeHighInput" type="number" min="0" max="65535" value="1800"><small>raw</small></label>
+            <label><span>入侵确认次数</span><input id="intrusionCountInput" type="number" min="1" max="10" value="2"><small>次</small></label>
             <button id="saveConfig" class="secondary-btn" type="button">保存配置</button>
             <p id="configSaveStatus" class="muted form-message">保存后会写入 Ubuntu 本地配置文件，设备 MQTT 下发尚未启用。</p>
           </form>

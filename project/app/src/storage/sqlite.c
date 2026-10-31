@@ -130,7 +130,13 @@ static int sqlite_prepare_sample_table(sqlite3 *db)
         "weather_week TEXT,"
         "weather_city TEXT,"
         "weather_text TEXT,"
-        "weather_temp TEXT"
+        "weather_temp TEXT,"
+        "smoke_raw INTEGER,"
+        "smoke_alarm INTEGER NOT NULL DEFAULT 0,"
+        "door_open INTEGER NOT NULL DEFAULT 0,"
+        "person_detected INTEGER NOT NULL DEFAULT 0,"
+        "facility_alarm INTEGER NOT NULL DEFAULT 0,"
+        "alarm_level INTEGER NOT NULL DEFAULT 0"
         ");";
 
     if (sqlite_exec_ddl(db, create_table_sql) != 0 ||
@@ -147,7 +153,13 @@ static int sqlite_prepare_sample_table(sqlite3 *db)
         sqlite_ensure_column(db, "ALTER TABLE sensor_samples ADD COLUMN weather_week TEXT;") != 0 ||
         sqlite_ensure_column(db, "ALTER TABLE sensor_samples ADD COLUMN weather_city TEXT;") != 0 ||
         sqlite_ensure_column(db, "ALTER TABLE sensor_samples ADD COLUMN weather_text TEXT;") != 0 ||
-        sqlite_ensure_column(db, "ALTER TABLE sensor_samples ADD COLUMN weather_temp TEXT;") != 0) {
+        sqlite_ensure_column(db, "ALTER TABLE sensor_samples ADD COLUMN weather_temp TEXT;") != 0 ||
+        sqlite_ensure_column(db, "ALTER TABLE sensor_samples ADD COLUMN smoke_raw INTEGER;") != 0 ||
+        sqlite_ensure_column(db, "ALTER TABLE sensor_samples ADD COLUMN smoke_alarm INTEGER NOT NULL DEFAULT 0;") != 0 ||
+        sqlite_ensure_column(db, "ALTER TABLE sensor_samples ADD COLUMN door_open INTEGER NOT NULL DEFAULT 0;") != 0 ||
+        sqlite_ensure_column(db, "ALTER TABLE sensor_samples ADD COLUMN person_detected INTEGER NOT NULL DEFAULT 0;") != 0 ||
+        sqlite_ensure_column(db, "ALTER TABLE sensor_samples ADD COLUMN facility_alarm INTEGER NOT NULL DEFAULT 0;") != 0 ||
+        sqlite_ensure_column(db, "ALTER TABLE sensor_samples ADD COLUMN alarm_level INTEGER NOT NULL DEFAULT 0;") != 0) {
         return -1;
     }
 
@@ -208,8 +220,9 @@ static int sqlite_insert_sample(sqlite_runtime_t *runtime, const data_t *sample)
 {
     static const char *insert_sql =
         "INSERT INTO sensor_samples(created_at, temp, humidity, source, alcohol_raw, alcohol_level, alcohol_alarm, "
-        "accel_x, accel_y, accel_z, motion_state, motion_alarm, weather_day, weather_week, weather_city, weather_text, weather_temp) "
-        "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+        "accel_x, accel_y, accel_z, motion_state, motion_alarm, weather_day, weather_week, weather_city, weather_text, weather_temp, "
+        "smoke_raw, smoke_alarm, door_open, person_detected, facility_alarm, alarm_level) "
+        "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
     sqlite3_stmt *stmt = NULL;
     char time_buffer[32];
 
@@ -266,6 +279,12 @@ static int sqlite_insert_sample(sqlite_runtime_t *runtime, const data_t *sample)
         sqlite3_bind_null(stmt, 16);
         sqlite3_bind_null(stmt, 17);
     }
+    sqlite3_bind_int(stmt, 18, sample->smoke_raw);
+    sqlite3_bind_int(stmt, 19, sample->smoke_alarm);
+    sqlite3_bind_int(stmt, 20, sample->door_open);
+    sqlite3_bind_int(stmt, 21, sample->person_detected);
+    sqlite3_bind_int(stmt, 22, sample->facility_alarm);
+    sqlite3_bind_int(stmt, 23, sample->alarm_level);
 
     if (sqlite3_step(stmt) != SQLITE_DONE) {
         printf("sqlite insert failed: %s\n", sqlite3_errmsg(runtime->db));

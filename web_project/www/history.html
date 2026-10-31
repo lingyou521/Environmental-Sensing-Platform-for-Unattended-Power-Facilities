@@ -3,15 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>历史数据 - 危运安全监控平台</title>
+  <title>历史数据 - 电力设施环境感知平台</title>
   <link rel="stylesheet" href="/assets/css/style.css">
 </head>
 <body class="app-page" data-page="history">
   <div class="app-shell">
     <aside class="sidebar">
       <div class="sidebar-brand">
-        <div class="brand-mark">危</div>
-        <div><strong>危运安全</strong><span>Ubuntu 监控端</span></div>
+        <div class="brand-mark">电</div>
+        <div><strong>电力设施感知</strong><span>Ubuntu 监控端</span></div>
       </div>
       <nav class="side-nav" aria-label="主导航">
         <a href="/index.html" data-nav="dashboard">实时监控</a>
@@ -38,16 +38,15 @@
         <div><span>最大值</span><strong id="historyMax">--</strong></div>
       </section>
       <section class="panel">
-        <div class="panel-head"><h2>采样趋势</h2><span>温湿度 / 酒精 / 加速度 / GPS</span></div>
+        <div class="panel-head"><h2>采样趋势</h2><span>温湿度 / 烟雾 / 门禁 / 人员</span></div>
         <div class="toolbar">
           <label><span>传感器</span><select id="sensorSelect">
             <option value="temperature">温度</option>
             <option value="humidity">湿度</option>
-            <option value="alcohol_raw">酒精 ADC 值</option>
-            <option value="accel_x">加速度 X</option>
-            <option value="accel_y">加速度 Y</option>
-            <option value="accel_z">加速度 Z</option>
-            <option value="gps_speed">GPS 速度</option>
+            <option value="smoke_raw">烟雾 ADC 值</option>
+            <option value="door_open">门磁状态</option>
+            <option value="person_detected">人员检测</option>
+            <option value="facility_alarm">综合告警</option>
           </select></label>
           <label><span>条数</span><select id="historyLimit">
             <option value="50">50</option>

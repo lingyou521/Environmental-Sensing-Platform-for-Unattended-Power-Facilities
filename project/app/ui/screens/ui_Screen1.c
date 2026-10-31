@@ -144,7 +144,7 @@ void ui_Screen1_screen_init(void)
     lv_obj_set_width(ui_Label2, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_Label2, LV_SIZE_CONTENT);    /// 1
     lv_obj_set_align(ui_Label2, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_Label2, "酒精浓度");
+    lv_label_set_text(ui_Label2, "烟雾浓度");
     lv_obj_set_style_text_align(ui_Label2, LV_TEXT_ALIGN_AUTO, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_Label2, &ui_font_Font1, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -172,7 +172,7 @@ void ui_Screen1_screen_init(void)
     lv_obj_set_x(ui_Label3, -55);
     lv_obj_set_y(ui_Label3, -91);
     lv_obj_set_align(ui_Label3, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_Label3, "驾驶舱状态");
+    lv_label_set_text(ui_Label3, "设施状态");
     lv_obj_set_style_text_align(ui_Label3, LV_TEXT_ALIGN_AUTO, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_Label3, &ui_font_Font1, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -190,7 +190,7 @@ void ui_Screen1_screen_init(void)
     lv_obj_set_x(ui_Label4, -66);
     lv_obj_set_y(ui_Label4, -56);
     lv_obj_set_align(ui_Label4, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_Label4, "车辆姿态监测");
+    lv_label_set_text(ui_Label4, "门禁与人员");
     lv_obj_set_style_text_align(ui_Label4, LV_TEXT_ALIGN_AUTO, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_Label4, &ui_font_Font1, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -265,7 +265,7 @@ void ui_Screen1_screen_init(void)
     lv_obj_set_x(ui_Label11, -223);
     lv_obj_set_y(ui_Label11, -13);
     lv_obj_set_align(ui_Label11, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_Label11, "X");
+    lv_label_set_text(ui_Label11, "门磁");
 
     ui_Label12 = lv_label_create(ui_Panel7);
     lv_obj_set_width(ui_Label12, LV_SIZE_CONTENT);   /// 1
@@ -273,7 +273,7 @@ void ui_Screen1_screen_init(void)
     lv_obj_set_x(ui_Label12, -70);
     lv_obj_set_y(ui_Label12, -13);
     lv_obj_set_align(ui_Label12, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_Label12, "Y");
+    lv_label_set_text(ui_Label12, "人体");
 
     ui_Label13 = lv_label_create(ui_Panel7);
     lv_obj_set_width(ui_Label13, LV_SIZE_CONTENT);   /// 1
@@ -281,7 +281,7 @@ void ui_Screen1_screen_init(void)
     lv_obj_set_x(ui_Label13, 94);
     lv_obj_set_y(ui_Label13, -14);
     lv_obj_set_align(ui_Label13, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_Label13, "Z");
+    lv_label_set_text(ui_Label13, "状态");
 
     ui_Label14 = lv_label_create(ui_Panel7);
     lv_obj_set_width(ui_Label14, LV_SIZE_CONTENT);   /// 2
@@ -289,7 +289,7 @@ void ui_Screen1_screen_init(void)
     lv_obj_set_x(ui_Label14, -159);
     lv_obj_set_y(ui_Label14, 42);
     lv_obj_set_align(ui_Label14, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_Label14, "状态");
+    lv_label_set_text(ui_Label14, "告警等级");
     lv_obj_set_style_text_align(ui_Label14, LV_TEXT_ALIGN_AUTO, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_Label14, &ui_font_Font1, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -299,7 +299,7 @@ void ui_Screen1_screen_init(void)
     lv_obj_set_x(ui_Label15, 29);
     lv_obj_set_y(ui_Label15, 42);
     lv_obj_set_align(ui_Label15, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_Label15, "告警");
+    lv_label_set_text(ui_Label15, "声光联动");
     lv_obj_set_style_text_align(ui_Label15, LV_TEXT_ALIGN_AUTO, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_Label15, &ui_font_Font1, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -317,7 +317,7 @@ void ui_Screen1_screen_init(void)
     lv_obj_set_x(ui_WeatherLabel, -103);
     lv_obj_set_y(ui_WeatherLabel, -84);
     lv_obj_set_align(ui_WeatherLabel, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_WeatherLabel, "天气预报");
+    lv_label_set_text(ui_WeatherLabel, "设备信息");
     lv_obj_set_style_text_align(ui_WeatherLabel, LV_TEXT_ALIGN_AUTO, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_WeatherLabel, &ui_font_Font1, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -344,7 +344,7 @@ void ui_Screen1_screen_init(void)
     lv_obj_set_x(ui_Label17, -115);
     lv_obj_set_y(ui_Label17, 13);
     lv_obj_set_align(ui_Label17, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_Label17, "城市");
+    lv_label_set_text(ui_Label17, "设备");
     lv_obj_set_style_text_align(ui_Label17, LV_TEXT_ALIGN_AUTO, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_Label17, &ui_font_Font1, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -354,7 +354,7 @@ void ui_Screen1_screen_init(void)
     lv_obj_set_x(ui_Label18, -102);
     lv_obj_set_y(ui_Label18, 59);
     lv_obj_set_align(ui_Label18, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_Label18, "天气状况");
+    lv_label_set_text(ui_Label18, "运行模式");
     lv_obj_set_style_text_align(ui_Label18, LV_TEXT_ALIGN_AUTO, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_Label18, &ui_font_Font1, LV_PART_MAIN | LV_STATE_DEFAULT);
 

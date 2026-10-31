@@ -77,6 +77,44 @@ static int test_parse_flat_payload(void)
     return 0;
 }
 
+static int test_parse_power_facility_payload(void)
+{
+    const char *payload =
+        "{\"device\":\"power_facility_01\",\"timestamp\":1719849600,"
+        "\"temperature\":24.5,\"humidity\":48.0,\"smoke_raw\":1900,"
+        "\"smoke_alarm\":true,\"door_open\":true,\"person_detected\":false,"
+        "\"facility_alarm\":true,\"alarm_level\":2}";
+    device_sample_t sample;
+
+    ASSERT_INT(0, payload_parse_json(payload, &sample));
+    ASSERT_DOUBLE(24.5, sample.temperature);
+    ASSERT_INT(1900, sample.smoke_raw);
+    ASSERT_INT(1, sample.smoke_alarm);
+    ASSERT_INT(1, sample.door_open);
+    ASSERT_INT(0, sample.person_detected);
+    ASSERT_INT(1, sample.facility_alarm);
+    ASSERT_INT(2, sample.alarm_level);
+    return 0;
+}
+
+static int test_parse_power_facility_property_payload(void)
+{
+    const char *payload =
+        "{\"params\":{\"temperature\":{\"value\":24.5},"
+        "\"humidity\":{\"value\":48},\"smoke_raw\":{\"value\":2100},"
+        "\"smoke_alarm\":{\"value\":1},\"door_open\":{\"value\":0},"
+        "\"person_detected\":{\"value\":1},\"facility_alarm\":{\"value\":1},"
+        "\"alarm_level\":{\"value\":1}}}";
+    device_sample_t sample;
+
+    ASSERT_INT(0, payload_parse_json(payload, &sample));
+    ASSERT_INT(2100, sample.smoke_raw);
+    ASSERT_INT(0, sample.door_open);
+    ASSERT_INT(1, sample.person_detected);
+    ASSERT_INT(1, sample.facility_alarm);
+    return 0;
+}
+
 static int test_cache_json_contains_current_status(void)
 {
     realtime_cache_t cache;
@@ -89,15 +127,10 @@ static int test_cache_json_contains_current_status(void)
     sample.timestamp = 1719849600ULL;
     sample.temperature = 25.6;
     sample.humidity = 55.0;
-    sample.alcohol_raw = 980;
-    sample.accel_x = 12;
-    sample.accel_y = -8;
-    sample.accel_z = 981;
-    sample.motion_alarm = 1;
-    sample.gps_lat = 39.9042;
-    sample.gps_lon = 116.4074;
-    sample.gps_speed = 60.5f;
-    sample.gps_satellites = 8;
+    sample.smoke_raw = 980;
+    sample.door_open = 1;
+    sample.facility_alarm = 1;
+    sample.alarm_level = 1;
 
     realtime_cache_update(&cache, &sample);
     ASSERT_INT(0, realtime_cache_to_json(&cache, json, sizeof(json)));
@@ -105,9 +138,8 @@ static int test_cache_json_contains_current_status(void)
     ASSERT_TRUE(strstr(json, "\"device\":\"device_01\"") != NULL);
     ASSERT_TRUE(strstr(json, "\"online\":true") != NULL);
     ASSERT_TRUE(strstr(json, "\"temperature\":25.60") != NULL);
-    ASSERT_TRUE(strstr(json, "\"motion_alarm\":true") != NULL);
-    ASSERT_TRUE(strstr(json, "\"lat\":39.904200") != NULL);
-    ASSERT_TRUE(strstr(json, "\"satellites\":8") != NULL);
+    ASSERT_TRUE(strstr(json, "\"door_open\":true") != NULL);
+    ASSERT_TRUE(strstr(json, "\"facility_alarm\":true") != NULL);
 
     realtime_cache_destroy(&cache);
     return 0;
@@ -265,6 +297,12 @@ static int test_reject_numeric_edge_cases(void)
 
 int main(void)
 {
+    if (test_parse_power_facility_payload() != 0) {
+        return 1;
+    }
+    if (test_parse_power_facility_property_payload() != 0) {
+        return 1;
+    }
     if (test_parse_flat_payload() != 0) {
         return 1;
     }

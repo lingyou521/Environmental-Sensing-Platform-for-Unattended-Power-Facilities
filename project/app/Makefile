@@ -35,20 +35,12 @@ APP_CSRCS += src/core/linkqueue.c
 APP_CSRCS += src/core/mailbox.c
 APP_CSRCS += src/core/log.c
 APP_CSRCS += src/device/sensor_common.c
-APP_CSRCS += src/device/cJSON.c
-APP_CSRCS += src/device/sensor_lm75.c
-APP_CSRCS += src/device/sensor_mq3.c
-APP_CSRCS += src/device/sensor_adxl345.c
-APP_CSRCS += src/device/sensor_dht11.c
-APP_CSRCS += src/device/weather_client.c
+APP_CSRCS += src/device/sensor_sht30.c
+APP_CSRCS += src/device/sensor_mq2.c
+APP_CSRCS += src/device/sensor_gpio.c
 APP_CSRCS += src/device/beep_control.c
-APP_CSRCS += src/device/sensor_gps.c
 APP_CSRCS += src/service/collect.c
-APP_CSRCS += src/service/weather.c
-APP_CSRCS += src/service/geofence.c
-APP_CSRCS += src/service/gps_service.c
 APP_CSRCS += src/comm/mqtt.c
-APP_CSRCS += src/comm/can_node.c
 APP_CSRCS += src/storage/sqlite.c
 APP_CSRCS += src/ui/lvgl_user.c
 APP_CSRCS += ui/mouse_cursor_icon.c
@@ -68,7 +60,6 @@ OBJS := $(APP_OBJS) $(REL_TP_OBJS) $(ABS_TP_OBJS)
 
 TEST_BIN := $(BUILD_DIR)/tests/test_sensor_common
 TEST_LOG_BIN := $(BUILD_DIR)/tests/test_log
-TEST_WEATHER_BIN := $(BUILD_DIR)/tests/test_weather_client
 
 .PHONY: all clean test
 
@@ -87,10 +78,9 @@ $(BUILD_DIR)/third_party/lvgl/%.o: %.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCPATH) -c $< -o $@
 
-test: $(TEST_BIN) $(TEST_LOG_BIN) $(TEST_WEATHER_BIN)
+test: $(TEST_BIN) $(TEST_LOG_BIN)
 	$(TEST_BIN)
 	$(TEST_LOG_BIN)
-	$(TEST_WEATHER_BIN)
 
 $(TEST_BIN): $(APP_DIR)/tests/test_sensor_common.c $(APP_DIR)/src/device/sensor_common.c
 	@mkdir -p $(BUILD_DIR)/tests
@@ -99,10 +89,6 @@ $(TEST_BIN): $(APP_DIR)/tests/test_sensor_common.c $(APP_DIR)/src/device/sensor_
 $(TEST_LOG_BIN): $(APP_DIR)/tests/test_log.c $(APP_DIR)/src/core/log.c
 	@mkdir -p $(BUILD_DIR)/tests
 	$(CC) -I$(APP_DIR)/include $(APP_DIR)/tests/test_log.c $(APP_DIR)/src/core/log.c -lpthread -o $@
-
-$(TEST_WEATHER_BIN): $(APP_DIR)/tests/test_weather_client.c $(APP_DIR)/src/device/weather_client.c $(APP_DIR)/src/device/cJSON.c
-	@mkdir -p $(BUILD_DIR)/tests
-	$(CC) -I$(APP_DIR)/include $(APP_DIR)/tests/test_weather_client.c $(APP_DIR)/src/device/weather_client.c $(APP_DIR)/src/device/cJSON.c -o $@
 
 clean:
 	rm -rf $(BUILD_DIR)
